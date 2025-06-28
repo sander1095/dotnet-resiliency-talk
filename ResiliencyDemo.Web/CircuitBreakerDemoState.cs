@@ -2,134 +2,71 @@ namespace ResiliencyDemo.Web;
 
 public class CircuitBreakerDemoState
 {
-    // Simple step-based state machine for predictable demo flow
-    private int _demoStep = 0;
+    private int _requestCount = 0;
     private readonly object _lock = new object();
 
-    public enum DemoStep
-    {
-        InitialFailures = 0,    // Steps 0-2: Fail to trigger circuit open
-        CircuitOpen = 3,        // Step 3: Circuit opened, fail fast
-        FirstHalfOpen = 4,      // Step 4: First half-open attempt (will fail and re-open)
-        CircuitReopened = 5,    // Step 5: Circuit re-opened after failed half-open
-        SecondHalfOpen = 6,     // Step 6: Second half-open attempt (will succeed)
-        PermanentlyHealthy = 7  // Step 7+: Always succeed
-    }
+    public int RequestCount => _requestCount;
 
-    public int CurrentStep => _demoStep;
-    public DemoStep CurrentDemoStep => (DemoStep)Math.Min(_demoStep, 7);
-
-    // Called by Polly when circuit opens
-    public void OnCircuitOpened()
-    {
-        lock (_lock)
-        {
-            // Don't reset the step - just log that circuit opened
-            Console.WriteLine($"🚨 Circuit opened at demo step {_demoStep}");
-        }
-    }
-
-    // Called by Polly when circuit closes
-    public void OnCircuitClosed()
-    {
-        lock (_lock)
-        {
-            // Circuit closed successfully - move to permanently healthy state
-            if (_demoStep == 6)
-            {
-                _demoStep = 7; // Move to permanently healthy
-            }
-            Console.WriteLine($"✅ Circuit closed at demo step {_demoStep}");
-        }
-    }
-
-    // Called by Polly when circuit goes half-open
-    public void OnCircuitHalfOpened()
-    {
-        lock (_lock)
-        {
-            // First time half-open: step 4, Second time: step 6
-            if (_demoStep == 3)
-            {
-                _demoStep = 4; // First half-open
-            }
-            else if (_demoStep == 5)
-            {
-                _demoStep = 6; // Second half-open
-            }
-            Console.WriteLine($"🔍 Circuit half-open at demo step {_demoStep}");
-        }
-    }
-
-    // Called before each request to get the behavior for this attempt
+    /// <summary>
+    /// Deterministic demo sequence:
+    /// Request 1: Success
+    /// Request 2: Fail  
+    /// Request 3: Fail (circuit opens)
+    /// Request 4: Fail (circuit is open - fail fast)
+    /// Request 5: Fail once in half-open (circuit re-opens)
+    /// Request 6+: Success (circuit closes and stays closed)
+    /// </summary>
     public void OnRequestAttempt()
     {
         lock (_lock)
         {
-            // Advance through different phases
-            if (_demoStep < 3)
-            {
-                _demoStep++; // Initial failures: 0->1->2->3
-                Console.WriteLine($"📈 Advanced to demo step {_demoStep}");
-            }
-            else if (_demoStep == 4)
-            {
-                // After first half-open failure, circuit re-opens
-                _demoStep = 5; // Move to "circuit re-opened" state
-                Console.WriteLine($"📈 Circuit re-opened, advanced to demo step {_demoStep}");
-            }
+            _requestCount++;
         }
     }
 
-    /// <summary>
-    /// Gets the demo behavior query parameter to send to the server
-    /// </summary>
     public string GetDemoBehavior()
     {
         lock (_lock)
         {
-            return CurrentDemoStep switch
+            return _requestCount switch
             {
-                DemoStep.InitialFailures => "force-fail",        // Steps 0-2: Always fail
-                DemoStep.CircuitOpen => "force-fail",            // Step 3: Fail fast (circuit open)
-                DemoStep.FirstHalfOpen => "force-fail",          // Step 4: First half-open fails
-                DemoStep.CircuitReopened => "force-fail",        // Step 5: Circuit re-opened, fail fast
-                DemoStep.SecondHalfOpen => "force-success",      // Step 6: Second half-open succeeds
-                DemoStep.PermanentlyHealthy => "force-success",  // Step 7+: Always succeed
-                _ => "force-fail"
+                1 => "force-success",  // First request succeeds
+                2 => "force-fail",     // Second request fails
+                3 => "force-fail",     // Third request fails (circuit opens)
+                4 => "force-fail",     // Fourth request fails fast (circuit is open)
+                5 => "force-fail",     // Fifth request fails in half-open (circuit re-opens)
+                _ => "force-success"   // All subsequent requests succeed (circuit closes)
             };
         }
     }
 
-    /// <summary>
-    /// Gets a human-readable description of current demo behavior
-    /// </summary>
     public string GetBehaviorDescription()
     {
         lock (_lock)
         {
-            return CurrentDemoStep switch
+            return _requestCount switch
             {
-                DemoStep.InitialFailures => $"Building failure history (step {_demoStep}/3)",
-                DemoStep.CircuitOpen => "Circuit OPEN - failing fast",
-                DemoStep.FirstHalfOpen => "First half-open test (will fail and re-open circuit)",
-                DemoStep.CircuitReopened => "Circuit RE-OPENED after failed half-open test",
-                DemoStep.SecondHalfOpen => "Second half-open test (will succeed and close circuit)",
-                DemoStep.PermanentlyHealthy => "Service recovered - permanently healthy",
-                _ => "Demo step unknown"
+                0 => "Ready for demo - first request will succeed",
+                1 => "Next 2 requests will fail to trigger circuit breaker",
+                2 => "Next request will fail and open the circuit",
+                3 => "Circuit should be OPEN - next request will fail fast",
+                4 => "Circuit should go HALF-OPEN - next request will fail and re-open circuit",
+                5 => "Circuit re-opened - next request will succeed and close circuit",
+                _ => "Circuit CLOSED - all requests now succeed"
             };
         }
     }
 
-    /// <summary>
-    /// Reset the demo to start over
-    /// </summary>
     public void Reset()
     {
         lock (_lock)
         {
-            _demoStep = 0;
-            Console.WriteLine("🔄 Demo state reset to step 0");
+            _requestCount = 0;
         }
     }
+
+    // These methods are called by Polly - we just log for debugging
+    public void OnCircuitOpened() => Console.WriteLine($"� Circuit OPENED after request {_requestCount}");
+    public void OnCircuitClosed() => Console.WriteLine($"✅ Circuit CLOSED after request {_requestCount}");  
+    public void OnCircuitHalfOpened() => Console.WriteLine($"🔍 Circuit HALF-OPEN after request {_requestCount}");
 }

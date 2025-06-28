@@ -83,11 +83,16 @@ This repository contains a comprehensive demo application showcasing resiliency 
    - Show console logs with retry attempts and jitter
    - Explain exponential backoff strategy
 
-4. **Circuit Breaker Demo**
-   - Click "Test Circuit Breaker" multiple times quickly
-   - Show how circuit opens after failures
-   - Wait 10 seconds and show it trying to close
-   - Explain the three states: Closed, Open, Half-Open
+4. **Circuit Breaker Demo** ⭐ **DETERMINISTIC FLOW**
+   - Click "Test Circuit Breaker" to see the predictable sequence:
+     - **Request 1**: ✅ Succeeds (establishing baseline)
+     - **Request 2**: ❌ Fails (starting to build failure rate)
+     - **Request 3**: ❌ Fails (circuit opens - 50% failure rate reached)
+     - **Request 4**: ⚡ Fails fast (circuit is open - no call to API)
+     - **Request 5**: 🔍 Fails in half-open (circuit re-opens)
+     - **Request 6+**: ✅ Succeeds (circuit closes and stays closed)
+   - Watch the request count and circuit state in the UI
+   - Perfect for presentations - completely predictable behavior!
 
 5. **Timeout Pattern Demo**
    - Click "Test Timeout Pattern" multiple times
@@ -114,12 +119,13 @@ This repository contains a comprehensive demo application showcasing resiliency 
 
 The API service exposes several endpoints with different characteristics:
 
-| Endpoint                | Behavior              | Purpose                  |
-| ----------------------- | --------------------- | ------------------------ |
-| `/weatherforecast`      | Reliable              | Baseline for retry demos |
-| `/unreliable-weather`   | 60% failure rate      | Circuit breaker demos    |
-| `/slow-weather`         | Random 0.1s-8s delays | Timeout demos            |
-| `/rate-limited-weather` | Server rate limiting  | Rate limiting demos      |
+| Endpoint                   | Behavior                    | Purpose               |
+| -------------------------- | --------------------------- | --------------------- |
+| `/weatherforecast`         | Reliable                    | Baseline/basic demos  |
+| `/unreliable-weather`      | 60% failure rate (random)   | Retry pattern demos   |
+| `/circuit-breaker-weather` | Deterministic demo behavior | Circuit breaker demos |
+| `/slow-weather`            | Random 4-6s delays          | Timeout demos         |
+| `/rate-limited-weather`    | Server rate limiting        | Rate limiting demos   |
 
 ## 📊 Polly Configuration Examples
 
@@ -136,15 +142,15 @@ new ResiliencePipelineBuilder<WeatherForecast[]>()
     .Build();
 ```
 
-### Circuit Breaker
+### Circuit Breaker (Demo-Optimized)
 ```csharp
 new ResiliencePipelineBuilder<WeatherForecast[]>()
     .AddCircuitBreaker(new CircuitBreakerStrategyOptions<WeatherForecast[]>
     {
-        FailureRatio = 0.5,
-        SamplingDuration = TimeSpan.FromSeconds(10),
-        MinimumThroughput = 3,
-        BreakDuration = TimeSpan.FromSeconds(10)
+        FailureRatio = 0.5,                          // 50% failure rate to trigger
+        SamplingDuration = TimeSpan.FromSeconds(30), // Long enough for demo sequence
+        MinimumThroughput = 2,                       // Only need 2 requests to evaluate
+        BreakDuration = TimeSpan.FromSeconds(3)      // Short break for fast demos
     })
     .Build();
 ```

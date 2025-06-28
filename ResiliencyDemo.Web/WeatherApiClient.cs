@@ -39,7 +39,7 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
         })
         .Build();
 
-    // Circuit breaker policy for unreliable endpoint - NO RETRY, just circuit breaker
+    // Circuit breaker policy - tuned for predictable demo behavior
     private readonly ResiliencePipeline<WeatherForecast[]> _circuitBreakerPipeline = new ResiliencePipelineBuilder<WeatherForecast[]>()
         .AddCircuitBreaker(new CircuitBreakerStrategyOptions<WeatherForecast[]>
         {
@@ -47,10 +47,10 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
                 .Handle<HttpRequestException>()
                 .Handle<InvalidOperationException>()
                 .Handle<TaskCanceledException>(),
-            FailureRatio = 0.5,
-            SamplingDuration = TimeSpan.FromSeconds(10),
-            MinimumThroughput = 3,
-            BreakDuration = TimeSpan.FromSeconds(5),
+            FailureRatio = 0.5,                          // 50% failure rate to trigger
+            SamplingDuration = TimeSpan.FromSeconds(30), // Longer sampling window for demo
+            MinimumThroughput = 2,                       // Only need 2 requests to evaluate
+            BreakDuration = TimeSpan.FromSeconds(3),     // Shorter break for faster demo
             OnOpened = args =>
             {
                 circuitState.OnCircuitOpened();
@@ -136,36 +136,6 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
         }
     }
 
-    public async Task<WeatherForecast[]> GetUnreliableWeatherAsync(CancellationToken cancellationToken = default)
-    {
-        // Track that we're making an attempt (this advances the demo step)
-        circuitState.OnRequestAttempt();
-
-        var demoBehavior = circuitState.GetDemoBehavior();
-        var behaviorDescription = circuitState.GetBehaviorDescription();
-
-        logger.LogInformation("⚡ Calling /unreliable-weather with CIRCUIT BREAKER policy. Demo step {DemoStep}: {BehaviorDescription}",
-            circuitState.CurrentStep, behaviorDescription);
-
-        try
-        {
-            var result = await _circuitBreakerPipeline.ExecuteAsync(async _ =>
-            {
-                var url = $"/unreliable-weather?demo={demoBehavior}";
-                var response = await httpClient.GetFromJsonAsync<WeatherForecast[]>(url, cancellationToken);
-                return response ?? [];
-            }, cancellationToken);
-
-            retryTracker.LogEvent("SUCCESS", "⚡ Circuit Breaker", $"Step {circuitState.CurrentStep}: Successfully retrieved {result.Length} weather forecasts");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            retryTracker.LogEvent("FAILURE", "⚡ Circuit Breaker", $"Step {circuitState.CurrentStep}: Request failed - {behaviorDescription}", ex.Message);
-            throw;
-        }
-    }
-
     public async Task<WeatherForecast[]> GetCircuitBreakerWeatherAsync(CancellationToken cancellationToken = default)
     {
         // Track that we're making an attempt (this advances the demo step)
@@ -174,8 +144,8 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
         var demoBehavior = circuitState.GetDemoBehavior();
         var behaviorDescription = circuitState.GetBehaviorDescription();
 
-        logger.LogInformation("⚡ Calling /circuit-breaker-weather with CIRCUIT BREAKER policy. Demo step {DemoStep}: {BehaviorDescription}",
-            circuitState.CurrentStep, behaviorDescription);
+        logger.LogInformation("⚡ Calling /circuit-breaker-weather with CIRCUIT BREAKER policy. Request {RequestCount}: {BehaviorDescription}",
+            circuitState.RequestCount, behaviorDescription);
 
         try
         {
@@ -187,12 +157,12 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
                 return response ?? [];
             }, cancellationToken);
 
-            retryTracker.LogEvent("SUCCESS", "⚡ Circuit Breaker", $"Step {circuitState.CurrentStep}: Successfully retrieved {result.Length} weather forecasts");
+            retryTracker.LogEvent("SUCCESS", "⚡ Circuit Breaker", $"Request {circuitState.RequestCount}: Successfully retrieved {result.Length} weather forecasts");
             return result;
         }
         catch (Exception ex)
         {
-            retryTracker.LogEvent("FAILURE", "⚡ Circuit Breaker", $"Step {circuitState.CurrentStep}: Request failed - {behaviorDescription}", ex.Message);
+            retryTracker.LogEvent("FAILURE", "⚡ Circuit Breaker", $"Request {circuitState.RequestCount}: Request failed - {behaviorDescription}", ex.Message);
             throw;
         }
     }

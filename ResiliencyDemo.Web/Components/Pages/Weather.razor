@@ -49,7 +49,7 @@
                         {
                             <div class="alert alert-success">
                                 ✅ Success! Retrieved @retryResult.Data?.Length forecasts in
-                                @retryResult.Duration.TotalMilliseconds:F0ms
+                                @retryResult.Duration.TotalMilliseconds milliseconds.
                             </div>
                         }
                         else
@@ -76,7 +76,7 @@
 
                 <div class="mb-3">
                     <strong>📊 Demo Status:</strong>
-                    <span class="badge bg-secondary ms-2">Step @CircuitState.CurrentStep</span>
+                    <span class="badge bg-secondary ms-2">Request #@CircuitState.RequestCount</span>
                     <br>
                     <small class="text-muted">@CircuitState.GetBehaviorDescription()</small>
                 </div>
@@ -104,7 +104,7 @@
                         {
                             <div class="alert alert-success">
                                 ✅ Success! Retrieved @circuitBreakerResult.Data?.Length forecasts in
-                                @circuitBreakerResult.Duration.TotalMilliseconds:F0ms
+                                @circuitBreakerResult.Duration.TotalMilliseconds milliseconds.
                             </div>
                         }
                         else
@@ -148,7 +148,7 @@
                         {
                             <div class="alert alert-success">
                                 ✅ Success! Retrieved @timeoutResult.Data?.Length forecasts in
-                                @timeoutResult.Duration.TotalMilliseconds:F0ms
+                                @timeoutResult.Duration.TotalMilliseconds milliseconds.
                             </div>
                         }
                         else
@@ -189,7 +189,7 @@
                         {
                             <div class="alert alert-success">
                                 ✅ Success! Retrieved @rateLimitResult.Data?.Length forecasts in
-                                @rateLimitResult.Duration.TotalMilliseconds
+                                @rateLimitResult.Duration.TotalMilliseconds milliseconds
                             </div>
                         }
                         else
