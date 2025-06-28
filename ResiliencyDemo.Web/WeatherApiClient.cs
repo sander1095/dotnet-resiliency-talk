@@ -68,25 +68,11 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
     private readonly ResiliencePipeline<WeatherForecast[]> _timeoutPipeline = new ResiliencePipelineBuilder<WeatherForecast[]>()
         .AddTimeout(new TimeoutStrategyOptions
         {
-            Timeout = TimeSpan.FromSeconds(3),
+            Timeout = TimeSpan.FromSeconds(2), // Reduced from 3s to 2s for more predictable demo
             OnTimeout = args =>
             {
                 retryTracker.LogEvent("TIMEOUT", "⏰ Timeout Pattern", $"Request exceeded {args.Timeout.TotalSeconds} seconds and was cancelled");
                 Console.WriteLine($"⏰ TIMEOUT: Request exceeded {args.Timeout.TotalSeconds} seconds and was cancelled");
-                return ValueTask.CompletedTask;
-            }
-        })
-        .AddRetry(new RetryStrategyOptions<WeatherForecast[]>
-        {
-            ShouldHandle = new PredicateBuilder<WeatherForecast[]>()
-                .Handle<TimeoutRejectedException>()
-                .Handle<TaskCanceledException>(),
-            MaxRetryAttempts = 2,
-            Delay = TimeSpan.FromSeconds(1),
-            OnRetry = args =>
-            {
-                retryTracker.LogEvent("RETRY", "⏰ Timeout Pattern", $"Attempt {args.AttemptNumber + 1} after timeout (Delay: {args.RetryDelay.TotalMilliseconds:F0}ms)");
-                Console.WriteLine($"🔄 TIMEOUT RETRY: Attempt {args.AttemptNumber + 1} after timeout");
                 return ValueTask.CompletedTask;
             }
         })
@@ -188,22 +174,28 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
 
     public async Task<WeatherForecast[]> GetSlowWeatherAsync(CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("🐌 Calling /slow-weather with TIMEOUT policy (3 second timeout)");
+        logger.LogInformation("🐌 Calling /slow-weather with TIMEOUT policy (2 second timeout)");
 
         try
         {
-            var result = await _timeoutPipeline.ExecuteAsync(async _ =>
+            var result = await _timeoutPipeline.ExecuteAsync(async timeoutToken =>
             {
-                var response = await httpClient.GetFromJsonAsync<WeatherForecast[]>("/slow-weather", cancellationToken);
+                // Use the timeout token from Polly, not the original cancellation token
+                var response = await httpClient.GetFromJsonAsync<WeatherForecast[]>("/slow-weather", timeoutToken);
                 return response ?? [];
             }, cancellationToken);
 
             retryTracker.LogEvent("SUCCESS", "⏰ Timeout Pattern", $"Successfully retrieved {result.Length} weather forecasts within timeout");
             return result;
         }
+        catch (TimeoutRejectedException ex)
+        {
+            retryTracker.LogEvent("TIMEOUT", "⏰ Timeout Pattern", "Request exceeded 2 seconds and was cancelled", ex.Message);
+            throw;
+        }
         catch (Exception ex)
         {
-            retryTracker.LogEvent("FAILURE", "⏰ Timeout Pattern", "Request failed due to timeout or other error", ex.Message);
+            retryTracker.LogEvent("FAILURE", "⏰ Timeout Pattern", "Request failed due to other error", ex.Message);
             throw;
         }
     }

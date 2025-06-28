@@ -92,7 +92,7 @@ app.MapGet("/slow-weather", async (ILogger<Program> logger) =>
     logger.LogInformation("🐌 Slow Weather API: Processing request #{RequestNumber}", currentRequest);
 
     // Randomly introduce delays to demonstrate timeouts
-    var delay = Random.Shared.Next(100, 8000); // 0.1s to 8s
+    var delay = Random.Shared.Next(500, 2300); // 1s to 6s (more predictable timeout demo)
     logger.LogInformation("⏱️  Slow Weather API: Simulating {DelayMs}ms processing time for request #{RequestNumber}", delay, currentRequest);
 
     await Task.Delay(delay);
