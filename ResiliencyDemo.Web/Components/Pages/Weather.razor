@@ -5,7 +5,6 @@
 @implements IDisposable
 
 @inject WeatherApiClient WeatherApi
-@inject IJSRuntime JSRuntime
 @inject RetryTrackingService RetryTracker
 @inject CircuitBreakerDemoState CircuitState
 
@@ -20,7 +19,7 @@
         <li><strong>Retry Pattern:</strong> Exponential backoff with jitter</li>
         <li><strong>Circuit Breaker:</strong> Fails fast when service is down</li>
         <li><strong>Timeout Pattern:</strong> Cancels long-running requests</li>
-        <li><strong>Rate Limiting:</strong> Server-side rate limiting demonstration</li>
+        <li><strong>Rate Limiting:</strong> Client-side rate limiting with Polly</li>
     </ul>
     <p><strong>💡 Tip:</strong> Watch the browser console (F12) for detailed logging!</p>
 </div>
