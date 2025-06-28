@@ -46,16 +46,29 @@ app.MapGet("/weatherforecast", (ILogger<Program> logger) =>
 .WithName("GetWeatherForecast");
 
 // Endpoint that fails randomly (for circuit breaker demo)
-app.MapGet("/unreliable-weather", (ILogger<Program> logger) =>
+app.MapGet("/unreliable-weather", (ILogger<Program> logger, string? demo = null) =>
 {
     var currentRequest = Interlocked.Increment(ref requestCounter);
-    logger.LogInformation("⚠️  Unreliable Weather API: Processing request #{RequestNumber}", currentRequest);
+    logger.LogInformation("⚠️  Unreliable Weather API: Processing request #{RequestNumber} with demo behavior: {DemoBehavior}", currentRequest, demo ?? "normal");
 
-    // Fail 60% of the time to demonstrate circuit breaker
-    if (Random.Shared.NextDouble() < 0.6)
+    // Determine failure behavior based on demo parameter
+    bool shouldFail = demo switch
     {
-        logger.LogError("💥 Unreliable Weather API: FAILED request #{RequestNumber} - Service temporarily unavailable", currentRequest);
-        throw new InvalidOperationException("Service temporarily unavailable - simulated failure");
+        "force-fail" => true,      // Always fail (for circuit breaker OPEN state)
+        "force-success" => false,  // Always succeed (for circuit breaker HALF-OPEN state)
+        _ => Random.Shared.NextDouble() < 0.6  // Normal 60% failure rate
+    };
+
+    if (shouldFail)
+    {
+        var reason = demo switch
+        {
+            "force-fail" => "Circuit breaker is OPEN - failing fast",
+            _ => "Service temporarily unavailable - simulated failure"
+        };
+
+        logger.LogError("💥 Unreliable Weather API: FAILED request #{RequestNumber} - {Reason}", currentRequest, reason);
+        throw new InvalidOperationException(reason);
     }
 
     var forecast = Enumerable.Range(1, 3).Select(index =>
@@ -117,6 +130,46 @@ app.MapGet("/rate-limited-weather", (ILogger<Program> logger) =>
     return forecast;
 })
 .WithName("GetRateLimitedWeatherForecast");
+
+// Dedicated endpoint for circuit breaker demo (separate from retry pattern)
+app.MapGet("/circuit-breaker-weather", (ILogger<Program> logger, string? demo = null) =>
+{
+    var currentRequest = Interlocked.Increment(ref requestCounter);
+    logger.LogInformation("⚡ Circuit Breaker Weather API: Processing request #{RequestNumber} with demo behavior: {DemoBehavior}", currentRequest, demo ?? "normal");
+
+    // Determine failure behavior based on demo parameter
+    bool shouldFail = demo switch
+    {
+        "force-fail" => true,      // Always fail (for circuit breaker demo)
+        "force-success" => false,  // Always succeed (for circuit breaker demo)
+        _ => Random.Shared.NextDouble() < 0.7  // Default 70% failure rate for circuit breaker
+    };
+
+    if (shouldFail)
+    {
+        var reason = demo switch
+        {
+            "force-fail" => "Circuit breaker demo - forced failure",
+            _ => "Circuit breaker service temporarily unavailable"
+        };
+
+        logger.LogError("💥 Circuit Breaker Weather API: FAILED request #{RequestNumber} - {Reason}", currentRequest, reason);
+        throw new InvalidOperationException(reason);
+    }
+
+    var forecast = Enumerable.Range(1, 3).Select(index =>
+        new WeatherForecast
+        (
+            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+            Random.Shared.Next(-20, 55),
+            summaries[Random.Shared.Next(summaries.Length)]
+        ))
+        .ToArray();
+
+    logger.LogInformation("✅ Circuit Breaker Weather API: Successfully returned forecast for request #{RequestNumber}", currentRequest);
+    return forecast;
+})
+.WithName("GetCircuitBreakerWeatherForecast");
 
 app.MapDefaultEndpoints();
 

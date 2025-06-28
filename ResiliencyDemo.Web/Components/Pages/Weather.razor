@@ -1,9 +1,13 @@
 ﻿@page "/weather"
 @attribute [StreamRendering(true)]
 @rendermode InteractiveServer
+@using ResiliencyDemo.Web
+@implements IDisposable
 
 @inject WeatherApiClient WeatherApi
 @inject IJSRuntime JSRuntime
+@inject RetryTrackingService RetryTracker
+@inject CircuitBreakerDemoState CircuitState
 
 <PageTitle>Weather - Polly Resiliency Patterns Demo</PageTitle>
 
@@ -70,14 +74,29 @@
                 <small>Fails fast when service is unreliable</small>
             </div>
             <div class="card-body">
-                <p>Demonstrates circuit breaker that opens when service fails repeatedly (60% failure rate).</p>
-                <button class="btn btn-warning" @onclick="TestCircuitBreaker" disabled="@isCircuitBreakerLoading">
-                    @if (isCircuitBreakerLoading)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
-                    }
-                    Test Circuit Breaker
-                </button>
+                <p>Demonstrates circuit breaker that opens when service fails repeatedly.</p>
+
+                <div class="mb-3">
+                    <strong>📊 Demo Status:</strong>
+                    <span class="badge bg-secondary ms-2">Step @CircuitState.CurrentStep</span>
+                    <br>
+                    <small class="text-muted">@CircuitState.GetBehaviorDescription()</small>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-warning" @onclick="TestCircuitBreaker" disabled="@isCircuitBreakerLoading">
+                        @if (isCircuitBreakerLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Test Circuit Breaker
+                    </button>
+
+                    <button class="btn btn-secondary btn-sm" @onclick="ResetCircuitBreakerDemo"
+                        title="Reset demo to start over">
+                        🔄 Reset Demo
+                    </button>
+                </div>
 
                 @if (circuitBreakerResult != null)
                 {
@@ -191,6 +210,60 @@
     </div>
 </div>
 
+<!-- Real-time Resilience Events -->
+@if (resilienceEvents.Any())
+{
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h5>🔍 Real-time Resilience Events</h5>
+            <small>Watch Polly patterns in action</small>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>Pattern</th>
+                            <th>Details</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var evt in resilienceEvents.OrderByDescending(e => e.Timestamp).Take(20))
+                        {
+                            <tr class="@evt.GetDisplayClass()">
+                                <td>
+                                    <span class="badge bg-secondary">@evt.GetIcon() @evt.EventType</span>
+                                </td>
+                                <td><strong>@evt.Pattern</strong></td>
+                                <td>
+                                    @evt.Details
+                                    @if (!string.IsNullOrEmpty(evt.Error))
+                                    {
+                                        <br />
+
+                                        <small class="text-danger">Error: @evt.Error</small>
+                                    }
+                                </td>
+                                <td><small>@evt.Timestamp.ToString("HH:mm:ss.fff")</small></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (resilienceEvents.Count > 20)
+                {
+                    <div class="text-center mt-2">
+                        <small class="text-muted">Showing last 20 events (Total: @resilienceEvents.Count)</small>
+                        <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="ClearEvents">Clear All</button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
 <!-- Results Summary -->
 @if (allResults.Any())
 {
@@ -251,6 +324,28 @@
     private TestResult? rateLimitResult;
 
     private List<TestResult> allResults = new();
+    private List<ResilienceEvent> resilienceEvents = new();
+
+    protected override void OnInitialized()
+    {
+        RetryTracker.OnResilienceEvent += OnResilienceEvent;
+    }
+
+    public void Dispose()
+    {
+        RetryTracker.OnResilienceEvent -= OnResilienceEvent;
+    }
+
+    private void OnResilienceEvent(ResilienceEvent evt)
+    {
+        resilienceEvents.Add(evt);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ClearEvents()
+    {
+        resilienceEvents.Clear();
+    }
 
     private async Task TestRetryPattern()
     {
@@ -295,7 +390,7 @@
 
         try
         {
-            var data = await WeatherApi.GetUnreliableWeatherAsync();
+            var data = await WeatherApi.GetCircuitBreakerWeatherAsync();
             stopwatch.Stop();
 
             circuitBreakerResult = new TestResult
@@ -322,6 +417,13 @@
 
         allResults.Add(circuitBreakerResult);
         isCircuitBreakerLoading = false;
+    }
+
+    private void ResetCircuitBreakerDemo()
+    {
+        CircuitState.Reset();
+        circuitBreakerResult = null;
+        StateHasChanged();
     }
 
     private async Task TestTimeoutPattern()
@@ -407,6 +509,5 @@
     }
 }
 
-                           
-                           
-                           
+
+

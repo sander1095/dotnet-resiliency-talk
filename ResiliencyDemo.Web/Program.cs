@@ -12,6 +12,12 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddOutputCache();
 
+// Add retry tracking service
+builder.Services.AddSingleton<RetryTrackingService>();
+
+// Add circuit breaker demo state (singleton for shared state across all users)
+builder.Services.AddSingleton<CircuitBreakerDemoState>();
+
 builder.Services.AddHttpClient<WeatherApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
