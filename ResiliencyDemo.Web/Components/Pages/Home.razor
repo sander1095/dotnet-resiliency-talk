@@ -1,0 +1,65 @@
+﻿@page "/"
+
+<PageTitle>Polly Resiliency Patterns Demo</PageTitle>
+
+<h1>🛡️ .NET Resiliency with Polly v8</h1>
+
+<div class="alert alert-primary">
+    <h4>Welcome to the Polly Resiliency Patterns Demo!</h4>
+    <p>This demo application showcases various resiliency patterns using <strong>Polly v8</strong> in a .NET Aspire
+        application.</p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>🎯 What You'll Learn</h3>
+        <ul class="list-group">
+            <li class="list-group-item">
+                <strong>🔄 Retry Pattern:</strong> Handle transient failures with exponential backoff and jitter
+            </li>
+            <li class="list-group-item">
+                <strong>⚡ Circuit Breaker:</strong> Fail fast when services are consistently unavailable
+            </li>
+            <li class="list-group-item">
+                <strong>⏰ Timeout Pattern:</strong> Cancel long-running operations to maintain responsiveness
+            </li>
+            <li class="list-group-item">
+                <strong>🚦 Rate Limiting:</strong> Control the rate of requests to protect downstream services
+            </li>
+        </ul>
+    </div>
+
+    <div class="col-md-6">
+        <h3>🏗️ Architecture</h3>
+        <div class="card">
+            <div class="card-body">
+                <p><strong>Frontend:</strong> Blazor Server with interactive components</p>
+                <p><strong>Backend:</strong> ASP.NET Core Web API with simulated failures</p>
+                <p><strong>Orchestration:</strong> .NET Aspire 9 for service discovery and resilience</p>
+                <p><strong>Resiliency:</strong> Polly v8 with modern resilience pipelines</p>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a href="/weather" class="btn btn-primary btn-lg">
+                🚀 Start Demo
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <div class="card bg-light">
+        <div class="card-body">
+            <h5>💡 Pro Tips for Your Presentation</h5>
+            <ul>
+                <li>Open browser developer tools (F12) to see detailed logging</li>
+                <li>Try the Circuit Breaker multiple times quickly to see it open</li>
+                <li>The API endpoints have different failure characteristics for realistic demos</li>
+                <li>Each pattern shows timing and success/failure metrics</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+       

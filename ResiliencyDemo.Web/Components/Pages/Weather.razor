@@ -1,0 +1,412 @@
+﻿@page "/weather"
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+@inject WeatherApiClient WeatherApi
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Weather - Polly Resiliency Patterns Demo</PageTitle>
+
+<h1>🛡️ Polly Resiliency Patterns Demo</h1>
+
+<div class="alert alert-info">
+    <h4>📋 Demo Instructions:</h4>
+    <p>This demo showcases various resiliency patterns using Polly v8:</p>
+    <ul>
+        <li><strong>Retry Pattern:</strong> Exponential backoff with jitter</li>
+        <li><strong>Circuit Breaker:</strong> Fails fast when service is down</li>
+        <li><strong>Timeout Pattern:</strong> Cancels long-running requests</li>
+        <li><strong>Rate Limiting:</strong> Server-side rate limiting demonstration</li>
+    </ul>
+    <p><strong>💡 Tip:</strong> Watch the browser console (F12) for detailed logging!</p>
+</div>
+
+<div class="row">
+    <!-- Basic Retry Pattern -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5>🔄 Retry Pattern</h5>
+                <small>Exponential backoff + jitter</small>
+            </div>
+            <div class="card-body">
+                <p>Demonstrates retry logic with exponential backoff and jitter when requests fail.</p>
+                <button class="btn btn-primary" @onclick="TestRetryPattern" disabled="@isRetryLoading">
+                    @if (isRetryLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Test Retry Pattern
+                </button>
+
+                @if (retryResult != null)
+                {
+                    <div class="mt-3">
+                        <h6>📊 Results:</h6>
+                        @if (retryResult.Success)
+                        {
+                            <div class="alert alert-success">
+                                ✅ Success! Retrieved @retryResult.Data?.Length forecasts in
+                                @retryResult.Duration.TotalMilliseconds:F0ms
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-danger">
+                                ❌ Failed: @retryResult.ErrorMessage
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Circuit Breaker Pattern -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5>⚡ Circuit Breaker Pattern</h5>
+                <small>Fails fast when service is unreliable</small>
+            </div>
+            <div class="card-body">
+                <p>Demonstrates circuit breaker that opens when service fails repeatedly (60% failure rate).</p>
+                <button class="btn btn-warning" @onclick="TestCircuitBreaker" disabled="@isCircuitBreakerLoading">
+                    @if (isCircuitBreakerLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Test Circuit Breaker
+                </button>
+
+                @if (circuitBreakerResult != null)
+                {
+                    <div class="mt-3">
+                        <h6>📊 Results:</h6>
+                        @if (circuitBreakerResult.Success)
+                        {
+                            <div class="alert alert-success">
+                                ✅ Success! Retrieved @circuitBreakerResult.Data?.Length forecasts in
+                                @circuitBreakerResult.Duration.TotalMilliseconds:F0ms
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-danger">
+                                ❌ Failed: @circuitBreakerResult.ErrorMessage
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="mt-2">
+                    <small class="text-muted">💡 Try clicking multiple times quickly to open the circuit breaker</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeout Pattern -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5>⏰ Timeout Pattern</h5>
+                <small>3 second timeout with retry</small>
+            </div>
+            <div class="card-body">
+                <p>Demonstrates timeout handling for slow services (random 0.1s-8s delays).</p>
+                <button class="btn btn-info" @onclick="TestTimeoutPattern" disabled="@isTimeoutLoading">
+                    @if (isTimeoutLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Test Timeout Pattern
+                </button>
+
+                @if (timeoutResult != null)
+                {
+                    <div class="mt-3">
+                        <h6>📊 Results:</h6>
+                        @if (timeoutResult.Success)
+                        {
+                            <div class="alert alert-success">
+                                ✅ Success! Retrieved @timeoutResult.Data?.Length forecasts in
+                                @timeoutResult.Duration.TotalMilliseconds:F0ms
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-danger">
+                                ❌ Failed: @timeoutResult.ErrorMessage
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Rate Limiting -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h5>🚦 Rate Limiting</h5>
+                <small>Server-side rate limiting demo</small>
+            </div>
+            <div class="card-body">
+                <p>Demonstrates server-side rate limiting (normally you'd implement client-side limiting too).</p>
+                <button class="btn btn-secondary" @onclick="TestRateLimiting" disabled="@isRateLimitLoading">
+                    @if (isRateLimitLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Test Rate Limiting
+                </button>
+
+                @if (rateLimitResult != null)
+                {
+                    <div class="mt-3">
+                        <h6>📊 Results:</h6>
+                        @if (rateLimitResult.Success)
+                        {
+                            <div class="alert alert-success">
+                                ✅ Success! Retrieved @rateLimitResult.Data?.Length forecasts in
+                                @rateLimitResult.Duration.TotalMilliseconds:F0ms
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-danger">
+                                ❌ Failed: @rateLimitResult.ErrorMessage
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="mt-2">
+                    <small class="text-muted">💡 Try clicking rapidly to trigger rate limiting</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Summary -->
+@if (allResults.Any())
+{
+    <div class="card mt-4">
+        <div class="card-header bg-dark text-white">
+            <h5>📈 Test Results Summary</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Pattern</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                            <th>Records</th>
+                            <th>Error</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var result in allResults.OrderByDescending(r => r.Timestamp))
+                        {
+                            <tr class="@(result.Success ? "table-success" : "table-danger")">
+                                <td><strong>@result.Pattern</strong></td>
+                                <td>
+                                    @if (result.Success)
+                                    {
+                                        <span class="badge bg-success">✅ Success</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">❌ Failed</span>
+                                    }
+                                </td>
+                                <td>@result.Duration.TotalMilliseconds:F0ms</td>
+                                <td>@(result.Data?.Length ?? 0)</td>
+                                <td>@result.ErrorMessage</td>
+                                <td>@result.Timestamp.ToString("HH:mm:ss")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isRetryLoading = false;
+    private bool isCircuitBreakerLoading = false;
+    private bool isTimeoutLoading = false;
+    private bool isRateLimitLoading = false;
+
+    private TestResult? retryResult;
+    private TestResult? circuitBreakerResult;
+    private TestResult? timeoutResult;
+    private TestResult? rateLimitResult;
+
+    private List<TestResult> allResults = new();
+
+    private async Task TestRetryPattern()
+    {
+        isRetryLoading = true;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var data = await WeatherApi.GetWeatherWithRetryAsync();
+            stopwatch.Stop();
+
+            retryResult = new TestResult
+            {
+                Pattern = "🔄 Retry",
+                Success = true,
+                Data = data,
+                Duration = stopwatch.Elapsed,
+                Timestamp = DateTime.Now
+            };
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            retryResult = new TestResult
+            {
+                Pattern = "🔄 Retry",
+                Success = false,
+                ErrorMessage = ex.Message,
+                Duration = stopwatch.Elapsed,
+                Timestamp = DateTime.Now
+            };
+        }
+
+        allResults.Add(retryResult);
+        isRetryLoading = false;
+    }
+
+    private async Task TestCircuitBreaker()
+    {
+        isCircuitBreakerLoading = true;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var data = await WeatherApi.GetUnreliableWeatherAsync();
+            stopwatch.Stop();
+
+            circuitBreakerResult = new TestResult
+            {
+                Pattern = "⚡ Circuit Breaker",
+                Success = true,
+                Data = data,
+                Duration = stopwatch.Elapsed,
+                Timestamp = DateTime.Now
+            };
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            circuitBreakerResult = new TestResult
+            {
+                Pattern = "⚡ Circuit Breaker",
+                Success = false,
+                ErrorMessage = ex.Message,
+                Duration = stopwatch.Elapsed,
+                Timestamp = DateTime.Now
+            };
+        }
+
+        allResults.Add(circuitBreakerResult);
+        isCircuitBreakerLoading = false;
+    }
+
+    private async Task TestTimeoutPattern()
+    {
+        isTimeoutLoading = true;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var data = await WeatherApi.GetSlowWeatherAsync();
+            stopwatch.Stop();
+
+            timeoutResult = new TestResult
+            {
+                Pattern = "⏰ Timeout",
+                Success = true,
+                Data = data,
+                Duration = stopwatch.Elapsed,
+                Timestamp = DateTime.Now
+            };
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            timeoutResult = new TestResult
+            {
+                Pattern = "⏰ Timeout",
+                Success = false,
+                ErrorMessage = ex.Message,
+                Duration = stopwatch.Elapsed,
+                Timestamp = DateTime.Now
+            };
+        }
+
+        allResults.Add(timeoutResult);
+        isTimeoutLoading = false;
+    }
+
+    private async Task TestRateLimiting()
+    {
+        isRateLimitLoading = true;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var data = await WeatherApi.GetRateLimitedWeatherAsync();
+            stopwatch.Stop();
+
+            rateLimitResult = new TestResult
+            {
+                Pattern = "🚦 Rate Limiting",
+                Success = true,
+                Data = data,
+                Duration = stopwatch.Elapsed,
+                Timestamp = DateTime.Now
+            };
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            rateLimitResult = new TestResult
+            {
+                Pattern = "🚦 Rate Limiting",
+                Success = false,
+                ErrorMessage = ex.Message,
+                Duration = stopwatch.Elapsed,
+                Timestamp = DateTime.Now
+            };
+        }
+
+        allResults.Add(rateLimitResult);
+        isRateLimitLoading = false;
+    }
+
+    private class TestResult
+    {
+        public string Pattern { get; set; } = "";
+        public bool Success { get; set; }
+        public WeatherForecast[]? Data { get; set; }
+        public TimeSpan Duration { get; set; }
+        public string ErrorMessage { get; set; } = "";
+        public DateTime Timestamp { get; set; }
+    }
+}
+
+                           
+                           
+                           
