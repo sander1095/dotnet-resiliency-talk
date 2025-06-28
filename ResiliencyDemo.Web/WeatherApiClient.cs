@@ -1,12 +1,23 @@
 using Polly;
 using Polly.CircuitBreaker;
+using Polly.RateLimiting;
 using Polly.Retry;
 using Polly.Timeout;
+using System.Threading.RateLimiting;
 
 namespace ResiliencyDemo.Web;
 
 public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> logger, RetryTrackingService retryTracker, CircuitBreakerDemoState circuitState)
 {
+    // Shared rate limiter for demo purposes - allows 3 requests per 10 seconds
+    private static readonly SlidingWindowRateLimiter _sharedRateLimiter = new(new SlidingWindowRateLimiterOptions
+    {
+        PermitLimit = 3,
+        Window = TimeSpan.FromSeconds(10),
+        SegmentsPerWindow = 2,
+        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        QueueLimit = 2
+    });
     // Basic retry policy with exponential backoff and jitter
     private readonly ResiliencePipeline<WeatherForecast[]> _retryPipeline = new ResiliencePipelineBuilder<WeatherForecast[]>()
         .AddRetry(new RetryStrategyOptions<WeatherForecast[]>
@@ -73,6 +84,20 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
             {
                 retryTracker.LogEvent("TIMEOUT", "⏰ Timeout Pattern", $"Request exceeded {args.Timeout.TotalSeconds} seconds and was cancelled");
                 Console.WriteLine($"⏰ TIMEOUT: Request exceeded {args.Timeout.TotalSeconds} seconds and was cancelled");
+                return ValueTask.CompletedTask;
+            }
+        })
+        .Build();
+
+    // Rate limiter policy - allows 3 requests per 10 seconds for easy demo
+    private readonly ResiliencePipeline<WeatherForecast[]> _rateLimiterPipeline = new ResiliencePipelineBuilder<WeatherForecast[]>()
+        .AddRateLimiter(new RateLimiterStrategyOptions
+        {
+            RateLimiter = args => _sharedRateLimiter.AcquireAsync(1, args.Context.CancellationToken),
+            OnRejected = args =>
+            {
+                retryTracker.LogEvent("RATE_LIMITED", "🚦 Rate Limiter", "Request rejected - rate limit exceeded");
+                Console.WriteLine("🚦 RATE LIMITER: Request rejected - rate limit exceeded");
                 return ValueTask.CompletedTask;
             }
         })
@@ -202,18 +227,27 @@ public class WeatherApiClient(HttpClient httpClient, ILogger<WeatherApiClient> l
 
     public async Task<WeatherForecast[]> GetRateLimitedWeatherAsync(CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("🚦 Calling /rate-limited-weather with simple HTTP client (rate limiting handled by server)");
+        logger.LogInformation("🚦 Calling /rate-limited-weather with RATE LIMITER policy (3 requests per 10 seconds)");
 
         try
         {
-            var response = await httpClient.GetFromJsonAsync<WeatherForecast[]>("/rate-limited-weather", cancellationToken);
-            var result = response ?? [];
-            retryTracker.LogEvent("SUCCESS", "🚦 Rate Limiting", $"Successfully retrieved {result.Length} weather forecasts from rate-limited endpoint");
+            var result = await _rateLimiterPipeline.ExecuteAsync(async _ =>
+            {
+                var response = await httpClient.GetFromJsonAsync<WeatherForecast[]>("/rate-limited-weather", cancellationToken);
+                return response ?? [];
+            }, cancellationToken);
+
+            retryTracker.LogEvent("SUCCESS", "🚦 Rate Limiter", $"Successfully retrieved {result.Length} weather forecasts from rate-limited endpoint");
             return result;
+        }
+        catch (RateLimiterRejectedException ex)
+        {
+            retryTracker.LogEvent("RATE_LIMITED", "🚦 Rate Limiter", "Request rejected - rate limit exceeded", ex.Message);
+            throw;
         }
         catch (Exception ex)
         {
-            retryTracker.LogEvent("FAILURE", "🚦 Rate Limiting", "Request was rate limited or failed", ex.Message);
+            retryTracker.LogEvent("FAILURE", "🚦 Rate Limiter", "Request failed due to other error", ex.Message);
             throw;
         }
     }

@@ -170,11 +170,12 @@
         <div class="card">
             <div class="card-header bg-secondary text-white">
                 <h5>🚦 Rate Limiting</h5>
-                <small>Server-side rate limiting demo</small>
+                <small>Polly client-side rate limiting (3 requests per 10 seconds)</small>
             </div>
             <div class="card-body">
-                <p>Demonstrates server-side rate limiting (normally you'd implement client-side limiting too).</p>
-                <button class="btn btn-secondary" @onclick="TestRateLimiting" disabled="@isRateLimitLoading">
+                <p>Demonstrates client-side rate limiting using Polly's sliding window rate limiter. Allows 3 requests
+                    per 10 seconds.</p>
+                <button class="btn btn-secondary" @onclick="TestRateLimiting">
                     @if (isRateLimitLoading)
                     {
                         <span class="spinner-border spinner-border-sm me-2"></span>
