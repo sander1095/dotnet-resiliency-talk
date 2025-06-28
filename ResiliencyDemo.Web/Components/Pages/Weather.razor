@@ -21,7 +21,6 @@
         <li><strong>Timeout Pattern:</strong> Cancels long-running requests</li>
         <li><strong>Rate Limiting:</strong> Client-side rate limiting with Polly</li>
     </ul>
-    <p><strong>💡 Tip:</strong> Watch the browser console (F12) for detailed logging!</p>
 </div>
 
 <div class="row">
@@ -190,7 +189,7 @@
                         {
                             <div class="alert alert-success">
                                 ✅ Success! Retrieved @rateLimitResult.Data?.Length forecasts in
-                                @rateLimitResult.Duration.TotalMilliseconds:F0ms
+                                @rateLimitResult.Duration.TotalMilliseconds
                             </div>
                         }
                         else
@@ -508,6 +507,3 @@
         public DateTime Timestamp { get; set; }
     }
 }
-
-
-

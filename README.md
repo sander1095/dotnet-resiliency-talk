@@ -75,7 +75,7 @@ This repository contains a comprehensive demo application showcasing resiliency 
    - Show the clean Aspire dashboard
 
 2. **Navigate to "Polly Resiliency Demo"**
-   - Open browser dev tools (F12) to show console logging
+   - Watch the real-time events table to see patterns in action
    - Explain each pattern before demonstrating
 
 3. **Retry Pattern Demo**
